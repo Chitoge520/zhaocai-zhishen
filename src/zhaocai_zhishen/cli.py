@@ -52,6 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
     quotes.add_argument("--input", type=Path, default=settings.project_root / "data" / "audit_ingestion")
     quotes.add_argument("--output", type=Path, default=settings.project_root / "data" / "quote_analysis")
 
+    cooccurrence = subparsers.add_parser("analyze-cooccurrence", help="执行 M4 跨项目投标人共现和异常团伙分析")
+    cooccurrence.add_argument("--input", type=Path, default=settings.project_root / "data" / "audit_ingestion")
+    cooccurrence.add_argument("--output", type=Path, default=settings.project_root / "data" / "cooccurrence_analysis")
+
     analyze = subparsers.add_parser("analyze", help="生成项目内无监督异常线索与页码证据")
     analyze.add_argument("--input", type=Path, default=settings.project_root / "data" / "processed")
     analyze.add_argument("--output", type=Path, default=settings.project_root / "data" / "analysis")
@@ -146,6 +150,12 @@ def main(argv: list[str] | None = None) -> None:
         from .quote_analysis import build_quote_analysis
 
         result = build_quote_analysis(args.input, args.output)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.command == "analyze-cooccurrence":
+        from .cooccurrence_analysis import build_cooccurrence_analysis
+
+        result = build_cooccurrence_analysis(args.input, args.output)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
     if args.command == "baseline":
