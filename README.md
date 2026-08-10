@@ -6,6 +6,7 @@
 
 - 已完成内部压缩包整理和投标文件分类
 - 已建立统一 CLI、配置和测试入口
+- 已完成 M1 统一多源审计数据层，支持 CSV/JSONL、跨项目 `bidder_id`、来源行追溯和四类覆盖率摘要
 - 支持 DOCX、文本型 PDF 和扫描 PDF 识别
 - 支持 RTX/NVIDIA GPU PaddleOCR，自动模式优先使用 GPU，失败时回退 RapidOCR
 - 可生成 `documents.jsonl`、`pages.jsonl`、`unsupervised_samples.jsonl` 和失败清单
@@ -58,6 +59,28 @@ data/training_internal/standard_dataset
 
 ```powershell
 .\run.ps1 check
+```
+
+## 导入统一多源审计数据
+
+M1 支持项目、企业、投标、报价、网络事件、文件元数据、历史关系和文档记录。可直接使用统一表，也可按 `quotes.csv`、`network_events.jsonl` 等文件名拆分导入：
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m zhaocai_zhishen ingest `
+  --input data/training_internal `
+  --output data/audit_ingestion
+```
+
+输出包括 `audit_records.jsonl`、`validation_issues.jsonl`、`bidder_index.json` 和 `coverage_summary.json`。缺少报价或 IP 时不会阻断文本分析；`bidder_id` 只用于身份映射，不是异常证据。脱敏模板见 `docs/templates/`。
+
+严格校验模式：
+
+```powershell
+.\.venv\Scripts\python.exe -m zhaocai_zhishen ingest `
+  --input data/training_internal `
+  --output data/audit_ingestion `
+  --strict
 ```
 
 ## 生成无监督样本
@@ -160,7 +183,7 @@ $env:PYTHONPATH=".\src"
 python -m unittest discover -s tests -v
 ```
 
-M0 验收时共有 46 项单元测试。安装开发依赖后也可以使用 `pytest`。
+M1 验收时共有 55 项单元测试，其中 M1 统一数据层专项测试 9 项。安装开发依赖后也可以使用 `pytest`。
 ## 比赛版本与安全基线
 
 当前比赛开发基线为 `0.3.0` / `competition-m0-2026.08`。统一 schema、算法版本、数据边界和聚合基线说明见 `docs/versioning-and-baseline.md`。

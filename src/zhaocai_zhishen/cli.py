@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("serve", help="启动本地审计驾驶舱")
 
+    ingest = subparsers.add_parser("ingest", help="导入 CSV/JSONL 多源审计数据并生成覆盖率摘要")
+    ingest.add_argument("--input", type=Path, default=settings.project_root / "data" / "training_internal")
+    ingest.add_argument("--output", type=Path, default=settings.project_root / "data" / "audit_ingestion")
+    ingest.add_argument("--strict", action="store_true", help="遇到 schema 错误时以失败退出")
+
     analyze = subparsers.add_parser("analyze", help="生成项目内无监督异常线索与页码证据")
     analyze.add_argument("--input", type=Path, default=settings.project_root / "data" / "processed")
     analyze.add_argument("--output", type=Path, default=settings.project_root / "data" / "analysis")
@@ -63,7 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=settings.project_root / "docs" / "baselines" / "competition-m0-baseline.json",
     )
-    baseline.add_argument("--tests", type=int, default=43, help="本轮已通过的单元测试数量")
+    baseline.add_argument("--tests", type=int, default=46, help="本轮已通过的单元测试数量")
     infer = subparsers.add_parser("infer", help="使用已训练模型对新项目分析结果进行异常评分")
     infer.add_argument("--input", type=Path, required=True)
     infer.add_argument("--model", type=Path, default=settings.project_root / "data" / "models" / "bid_anomaly_model.json")
@@ -107,6 +112,12 @@ def main(argv: list[str] | None = None) -> None:
         from .server import main as serve
 
         serve()
+        return
+    if args.command == "ingest":
+        from .audit_ingestion import ingest_audit_data
+
+        result = ingest_audit_data(args.input, args.output, strict=args.strict)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return
     if args.command == "baseline":
         from .baseline import build_baseline_manifest, write_baseline_manifest

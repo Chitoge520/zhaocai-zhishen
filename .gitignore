@@ -27,6 +27,8 @@ data/*
 *.xls
 *.xlsx
 *.csv
+!docs/templates/
+!docs/templates/*.csv
 *.zip
 *.log
 *.pid

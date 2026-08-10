@@ -9,6 +9,7 @@ from urllib.parse import quote, unquote, urlparse
 
 from .analysis import build_analysis
 from .analysis_results import load_unsupervised_results
+from .audit_ingestion import load_coverage_summary
 from .config import load_settings
 from .demo_mode import load_demo_snapshot
 from .evidence_graph import load_evidence_graph
@@ -174,6 +175,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/projects/jobs":
             self._send_json({"jobs": list_jobs(JOBS_ROOT)})
             return
+        if path.startswith("/api/projects/jobs/") and path.endswith("/coverage"):
+            parts = path.strip("/").split("/")
+            job_id = parts[-2] if len(parts) >= 4 else ""
+            job = get_job(JOBS_ROOT, job_id) if job_id else None
+            coverage = load_coverage_summary(JOBS_ROOT / job_id / "audit_ingestion" / "coverage_summary.json") if job else None
+            self._send_json({"job_id": job_id, "coverage": coverage} if coverage is not None else {"error": "任务不存在"}, 200 if coverage is not None else 404)
+            return
         if path.startswith("/api/projects/jobs/") and path.endswith("/results"):
             parts = path.strip("/").split("/")
             results = load_job_results(JOBS_ROOT, parts[-2]) if len(parts) >= 5 else None
@@ -183,15 +191,19 @@ class Handler(BaseHTTPRequestHandler):
             job = get_job(JOBS_ROOT, path.rsplit("/", 1)[-1])
             self._send_json(job if job else {"error": "任务不存在"}, 200 if job else 404)
             return
+        if path == "/api/coverage":
+            self._send_json(load_coverage_summary(DATA_ROOT / "audit_ingestion" / "coverage_summary.json"))
+            return
         if path == "/api/ingest/status":
             training = DATA_ROOT / "training_internal"
             summary_path = training / "summary.json"
             processed_path = DATA_ROOT / "processed" / "summary.json"
             analysis_path = settings.analysis_dir / "analysis_summary.json"
+            audit_coverage = load_coverage_summary(DATA_ROOT / "audit_ingestion" / "coverage_summary.json")
             summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else {}
             processed = json.loads(processed_path.read_text(encoding="utf-8")) if processed_path.exists() else {}
             analysis = json.loads(analysis_path.read_text(encoding="utf-8")) if analysis_path.exists() else {}
-            self._send_json({"training": summary, "processed": processed, "analysis": analysis, "ready": bool(summary and analysis)})
+            self._send_json({"training": summary, "processed": processed, "analysis": analysis, "audit": audit_coverage, "ready": bool(summary and analysis)})
             return
         if path == "/api/model/status":
             model_dir = DATA_ROOT / "models"
