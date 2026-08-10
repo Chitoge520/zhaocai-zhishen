@@ -1,0 +1,52 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.agents/
+.codex/
+
+# Sensitive/local data and generated artifacts
+data/*
+!data/.gitkeep
+训练数据/
+投标文件/
+1 投标文件/
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.csv
+*.zip
+*.log
+*.pid
+*.started_at
+*.sqlite
+*.sqlite3
+*.db
+*.tmp
+*.bak
+
+# Local model weights and binary inference artifacts
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# OS/editor
+~$*
+.DS_Store
+Thumbs.db

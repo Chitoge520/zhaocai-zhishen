@@ -1,0 +1,84 @@
+{
+  "schema_version": "bid-audit-baseline/v1",
+  "generated_at": "2026-08-10T06:32:30+00:00",
+  "release": "competition-m0-2026.08",
+  "versions": {
+    "package_version": "0.3.0",
+    "audit_schema_version": "bid-audit/v1",
+    "evidence_schema_version": "bid-audit-evidence/v1",
+    "algorithm_version": "bid-audit-unsupervised/v1",
+    "model_schema_version": "bid-anomaly-model/v1",
+    "actual_model_schema_version": "bid-anomaly-model/v1",
+    "training_schema_version": "bid-anomaly-training/v2",
+    "synthetic_schema_version": "bid-synthetic-benchmark/v2"
+  },
+  "processed_data": {
+    "sample_count": 63,
+    "success_count": 63,
+    "failure_count": 0,
+    "page_count": 13732,
+    "raw_text_char_count": 7872221,
+    "analysis_text_char_count": 7450481,
+    "removed_redundant_line_count": 33444,
+    "duplicate_page_count": 0,
+    "text_cleaning_rule_version": "ocr-cleanup/v1",
+    "ocr_engine": "paddle-gpu"
+  },
+  "analysis": {
+    "project_count": 15,
+    "document_count": 63,
+    "pair_count": 162,
+    "anomaly_count": 1,
+    "high_risk_count": 1,
+    "medium_risk_count": 0
+  },
+  "model": {
+    "model_type": "robust_unsupervised_pairwise",
+    "training_project_count": 12,
+    "training_pair_count": 150,
+    "feature_count": 15,
+    "threshold": 40.0,
+    "label_status": "unlabeled_unsupervised"
+  },
+  "synthetic_benchmark": {
+    "source_row_count": 150,
+    "generated_row_count": 2100,
+    "train_row_count": 1764,
+    "test_row_count": 336,
+    "transform_count": 14,
+    "project_isolation_check": true
+  },
+  "quality_gate": {
+    "unit_test_count": 46,
+    "unit_tests_passed": true
+  },
+  "source_artifacts": [
+    {
+      "logical_name": "processed_summary",
+      "sha256": "f2ab439ad01072f2a2e9a3d4cefdb81e93eb85a6d41860bd04b79104377f8c53"
+    },
+    {
+      "logical_name": "analysis_summary",
+      "sha256": "c2f9d5bdfaad878e58661c1bc42f797acbe16e4acb33b1334dd6eb84f72ac9a4"
+    },
+    {
+      "logical_name": "training_summary",
+      "sha256": "ff12e5a1d8965d300bfb8031c484e080590428a9d2953f67d73fb73924b16a36"
+    },
+    {
+      "logical_name": "model_definition",
+      "sha256": "16b588207b1491df2a0e2f9d0268274561234c7968f19eabd01b68c7b6f8cac3"
+    },
+    {
+      "logical_name": "synthetic_generation_summary",
+      "sha256": "f7cdf294b1332adc7052202ed0ecde0730644454c37c17562a8d31b6dde58b25"
+    }
+  ],
+  "data_boundary": {
+    "contains_raw_bid_files": false,
+    "contains_bidder_identifiers": false,
+    "contains_absolute_local_paths": false,
+    "note": "清单只保留聚合指标和摘要哈希；真实文件、处理正文、项目标识、日志和模型产物继续保留在 Git 忽略目录。"
+  },
+  "result_boundary": "系统输出仅为待复核异常线索，不直接认定串标、围标或违法违规。"
+}
