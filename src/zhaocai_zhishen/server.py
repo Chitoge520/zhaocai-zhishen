@@ -17,11 +17,12 @@ from .evidence_replay import load_evidence_detail
 from .job_manager import cancel_job, create_job, get_job, list_jobs, load_job_results
 from .llm_analysis import get_llm_config, validate_llm_base_url
 from .network_analysis import load_network_analysis
+from .quote_analysis import load_quote_analysis
 from .reporting import build_docx_report, build_report_payload, render_html_report
 
 settings = load_settings()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-DATA_ROOT = settings.project_root / "data"
+DATA_ROOT = settings.data_dir
 JOBS_ROOT = DATA_ROOT / "jobs"
 MODEL_PATH = DATA_ROOT / "models" / "bid_anomaly_model.json"
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024
@@ -97,6 +98,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/network-analysis":
             self._send_json(load_network_analysis(DATA_ROOT / "network_analysis"))
+            return
+        if path == "/api/quote-analysis":
+            self._send_json(load_quote_analysis(DATA_ROOT / "quote_analysis"))
             return
         if path == "/api/evidence-graph":
             self._send_json(load_evidence_graph(settings.analysis_dir, model_path=MODEL_PATH))

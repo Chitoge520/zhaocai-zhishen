@@ -65,7 +65,14 @@ FIELD_ALIASES = {
     "bidder_name": {"bidder_name", "bidder", "company_name", "bidder_candidate", "投标人名称", "投标人", "企业名称", "供应商名称"},
     "bidder_aliases": {"bidder_aliases", "aliases", "企业别名", "投标人别名"},
     "credit_code": {"credit_code", "uscc", "统一社会信用代码", "信用代码"},
-    "amount": {"amount", "quote_amount", "bid_amount", "报价金额", "投标报价", "总价", "金额"},
+    "amount": {"amount", "quote_amount", "bid_amount", "total_price", "quote_total", "total_price_tax_included", '报价金额', '投标报价', '总价', '金额'},
+    "control_amount": {"control_amount", "control_price", "budget_amount", "ceiling_price", '最高限价', '控制价', '招标控制价', '预算金额'},
+    "amount_unit": {"amount_unit", "price_unit", "currency_unit", '金额单位', '报价单位'},
+    "quote_scope": {"quote_scope", "quote_type", "price_type", '报价类型', '报价口径', '报价层级'},
+    "item_code": {"item_code", "line_item_code", '分项编号', '清单编号', '项目编码'},
+    "item_name": {"item_name", "line_item_name", '分项名称', '清单名称'},
+    "quantity": {"quantity", "qty", '数量', '工程量'},
+    "unit_price": {"unit_price", '单价', '报价单价'},
     "currency": {"currency", "币种", "货币"},
     "event_time": {"event_time", "timestamp", "time", "事件时间", "操作时间", "时间"},
     "ip_address": {"ip_address", "ip", "ip地址", "网络地址"},
@@ -328,6 +335,13 @@ class AuditRecord:
     credit_code: str = ""
     bidder_aliases: list[str] = field(default_factory=list)
     amount: str | None = None
+    control_amount: str | None = None
+    amount_unit: str = ""
+    quote_scope: str = ""
+    item_code: str = ""
+    item_name: str = ""
+    quantity: str | None = None
+    unit_price: str | None = None
     currency: str = "CNY"
     event_time: str = ""
     ip_address: str = ""
@@ -400,14 +414,21 @@ def validate_and_normalize_fields(
         ))
         return None, issues
 
-    normalized = {key: normalize_text(value) for key, value in canonical.items() if key not in {"amount", "bidder_aliases"}}
+    normalized = {key: normalize_text(value) for key, value in canonical.items() if key not in {"amount", "control_amount", "quantity", "unit_price", "bidder_aliases"}}
     normalized["record_type"] = record_type
     normalized["bidder_aliases"] = split_aliases(canonical.get("bidder_aliases"))
     normalized["extra"] = {key: value for key, value in extra.items() if normalize_text(value)}
 
     amount, amount_ok = parse_amount(canonical.get("amount"))
     normalized["amount"] = amount
-    if not amount_ok:
+    quote_scope = normalize_text(canonical.get("quote_scope")).lower().replace("_", "-")
+    is_item_quote = record_type in {"quote", "bid"} and (
+        quote_scope in {"item", "line-item", "unit", "??", "????", "??"}
+        or bool(normalize_text(canonical.get("item_code")) or normalize_text(canonical.get("item_name")))
+    )
+    _, unit_price_ok = parse_amount(canonical.get("unit_price"))
+    missing_total_amount = canonical.get("amount") in (None, "")
+    if not amount_ok and not (is_item_quote and missing_total_amount and unit_price_ok):
         issues.append(ValidationIssue(
             code="invalid_amount",
             message="金额不是有效的正数，已按缺失值降级处理",
@@ -417,6 +438,20 @@ def validate_and_normalize_fields(
             row_number=source.row_number,
             value_hint=redacted_value_hint("amount", canonical.get("amount")),
         ))
+
+    for monetary_field in ("control_amount", "quantity", "unit_price"):
+        value, valid = parse_amount(canonical.get(monetary_field))
+        normalized[monetary_field] = value
+        if canonical.get(monetary_field) not in (None, "") and not valid:
+            issues.append(ValidationIssue(
+                code=f"invalid_{monetary_field}",
+                message=f"{monetary_field} 必须是大于零的数值，已降级为空值。",
+                severity="warning",
+                field=monetary_field,
+                source_path=source.source_path,
+                row_number=source.row_number,
+                value_hint=redacted_value_hint(monetary_field, canonical.get(monetary_field)),
+            ))
 
     for time_field in ("event_time", "created_at", "modified_at", "uploaded_at"):
         parsed_time, time_ok = parse_timestamp(canonical.get(time_field))

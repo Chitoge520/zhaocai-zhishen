@@ -18,6 +18,7 @@ from .document_pipeline import prepare_dataset
 from .llm_analysis import run_llm_analysis
 from .model_inference import run_model_inference
 from .network_analysis import build_network_analysis, load_network_analysis
+from .quote_analysis import build_quote_analysis, load_quote_analysis
 from .unsupervised_analysis import build_unsupervised_analysis
 
 _GPU_JOB_LOCK = threading.Lock()
@@ -95,6 +96,9 @@ def _run_job(job_dir: Path, model_path: Path) -> None:
         _write_status(job_dir, phase="网络、设备和文件元数据关联", progress=23)
         network_analysis = build_network_analysis(job_dir / "audit_ingestion", job_dir / "network_analysis")
         _ensure_job_active(job_dir, deadline)
+        _write_status(job_dir, phase="报价聚类与规律性差异分析", progress=27)
+        quote_analysis = build_quote_analysis(job_dir / "audit_ingestion", job_dir / "quote_analysis")
+        _ensure_job_active(job_dir, deadline)
         standard_dir = dataset_dir / "standard_dataset"
         if not (standard_dir / "samples.csv").exists():
             raise ValueError("压缩包中没有识别到可分析的投标文件")
@@ -140,7 +144,7 @@ def _run_job(job_dir: Path, model_path: Path) -> None:
             state="completed",
             phase="分析完成",
             progress=100,
-            result={"inference": inference, "llm": llm, "audit_ingestion": audit_ingestion, "network_analysis": network_analysis},
+            result={"inference": inference, "llm": llm, "audit_ingestion": audit_ingestion, "network_analysis": network_analysis, "quote_analysis": quote_analysis},
         )
     except Exception as exc:
         (job_dir / "error.log").write_text(traceback.format_exc(), encoding="utf-8")
@@ -217,6 +221,7 @@ def load_job_results(jobs_root: Path, job_id: str) -> dict | None:
     llm_path = job_dir / "llm" / "llm_analysis.json"
     coverage = load_coverage_summary(job_dir / "audit_ingestion" / "coverage_summary.json")
     network = load_network_analysis(job_dir / "network_analysis")
+    quotes = load_quote_analysis(job_dir / "quote_analysis")
     llm = json.loads(llm_path.read_text(encoding="utf-8")) if llm_path.exists() else {
         "status": "skipped",
         "findings": [],
@@ -230,4 +235,5 @@ def load_job_results(jobs_root: Path, job_id: str) -> dict | None:
         "llm": llm,
         "audit_coverage": coverage,
         "network_analysis": network,
+        "quote_analysis": quotes,
     }

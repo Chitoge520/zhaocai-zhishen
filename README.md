@@ -100,6 +100,21 @@ $env:PYTHONPATH='src'
 每类信号分别标记 `triggered`、`no_signal`、`not_provided` 或 `excluded`。系统只输出待复核异常线索；单一 IP、设备、账号、作者、哈希或时间接近不能直接定性。共享网络和元数据值在结果中脱敏。模块说明见 `docs/module-reports/module-15-network-metadata-linkage.md`。
 
 
+## 生成报价聚类与规律性差异线索
+
+M3 只消费 M1 已校验标准记录，严格区分总价与分项报价，对同一项目不同投标人执行全组合无监督比较：
+
+~~~powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m zhaocai_zhishen analyze-quotes `
+  --input data/audit_ingestion `
+  --output data/quote_analysis
+~~~
+
+输出包括 price_features.jsonl、price_graph.json 和 price_analysis_summary.json；服务接口为 GET /api/quote-analysis。金额会按元、千元、万元等单位归一；未知金额单位、币种不一致和冲突总价会被标记为 excluded，缺少报价、控制价或共同分项会标记为 not_provided。
+
+所有报价结果均为待复核异常线索，不能宣传为真实准确率或直接认定围标、串标、违法违规。单一价格接近、尾数、固定差额、统计偏离或分项相关性必须结合网络、设备、文件和业务流程证据交叉验证。模块说明见 docs/module-reports/module-16-quote-clustering.md，脱敏模板见 docs/templates/quote-analysis-example.jsonl。
+
 ## 生成无监督样本
 
 ```powershell

@@ -48,6 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     links.add_argument("--network-window-minutes", type=int, default=30)
     links.add_argument("--metadata-window-seconds", type=int, default=300)
 
+    quotes = subparsers.add_parser("analyze-quotes", help="执行 M3 项目内报价聚类与规律性差异分析")
+    quotes.add_argument("--input", type=Path, default=settings.project_root / "data" / "audit_ingestion")
+    quotes.add_argument("--output", type=Path, default=settings.project_root / "data" / "quote_analysis")
+
     analyze = subparsers.add_parser("analyze", help="生成项目内无监督异常线索与页码证据")
     analyze.add_argument("--input", type=Path, default=settings.project_root / "data" / "processed")
     analyze.add_argument("--output", type=Path, default=settings.project_root / "data" / "analysis")
@@ -136,6 +140,12 @@ def main(argv: list[str] | None = None) -> None:
             network_window_seconds=max(1, args.network_window_minutes) * 60,
             metadata_window_seconds=max(1, args.metadata_window_seconds),
         )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.command == "analyze-quotes":
+        from .quote_analysis import build_quote_analysis
+
+        result = build_quote_analysis(args.input, args.output)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
     if args.command == "baseline":

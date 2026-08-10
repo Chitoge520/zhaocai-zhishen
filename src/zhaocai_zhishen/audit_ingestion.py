@@ -403,7 +403,8 @@ def _build_record(row: dict[str, Any], source: SourceReference, registry: Bidder
         issues.append(_issue("missing_project", "缺少项目编号或项目名称，记录仍保留但无法进行项目级聚合", "project_id", source))
     if record_type in bidder_scoped and not bidder_id:
         issues.append(_issue("missing_bidder", "缺少企业名称或有效信用代码，记录仍保留但无法进行企业级关联", "bidder_id", source))
-    if record_type == "quote" and row.get("amount") is None:
+    is_item_quote = bool(row.get("item_code") or row.get("item_name") or row.get("unit_price"))
+    if record_type == "quote" and row.get("amount") is None and not (is_item_quote and row.get("unit_price") is not None):
         issues.append(_issue("missing_amount", "报价记录缺少有效金额，文本和其他数据仍可继续分析", "amount", source))
     if record_type == "network_event" and not row.get("ip_address") and not normalize_text(row.get("device_id")):
         issues.append(_issue("missing_network_identity", "网络日志缺少 IP 和设备标识，已降级保留时间及来源信息", "ip_address", source))
@@ -424,6 +425,13 @@ def _build_record(row: dict[str, Any], source: SourceReference, registry: Bidder
         credit_code=credit_code,
         bidder_aliases=list(row.get("bidder_aliases") or []),
         amount=row.get("amount"),
+        control_amount=row.get("control_amount"),
+        amount_unit=normalize_text(row.get("amount_unit")),
+        quote_scope=normalize_text(row.get("quote_scope")).lower(),
+        item_code=normalize_text(row.get("item_code")),
+        item_name=normalize_text(row.get("item_name")),
+        quantity=row.get("quantity"),
+        unit_price=row.get("unit_price"),
         currency=normalize_text(row.get("currency") or "CNY").upper(),
         event_time=normalize_text(row.get("event_time")),
         ip_address=normalize_text(row.get("ip_address")),
@@ -487,7 +495,8 @@ def _coverage_summary(
             missing_fields["project_id"] += 1
         if not record.bidder_id and record.record_type not in {"project"}:
             missing_fields["bidder_id"] += 1
-        if record.record_type == "quote" and record.amount is None:
+        is_item_quote = bool(record.item_code or record.item_name or record.unit_price)
+        if record.record_type == "quote" and record.amount is None and not (is_item_quote and record.unit_price is not None):
             missing_fields["amount"] += 1
         if record.record_type == "network_event" and not record.ip_address:
             missing_fields["ip_address"] += 1
@@ -523,7 +532,7 @@ def _coverage_summary(
         },
         "categories": {
             "files": category({"document", "file_metadata"}, lambda row: bool(row.file_name or row.file_path or row.file_sha256)),
-            "quotes": category({"quote"}, lambda row: row.amount is not None),
+            "quotes": category({"quote"}, lambda row: row.amount is not None or (bool(row.item_code or row.item_name or row.unit_price) and row.unit_price is not None)),
             "ip": category({"network_event"}, lambda row: bool(row.ip_address)),
             "history": category({"historical_relation"}, lambda row: bool(row.related_bidder_id)),
         },

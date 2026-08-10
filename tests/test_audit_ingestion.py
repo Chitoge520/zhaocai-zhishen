@@ -156,5 +156,38 @@ class AuditIngestionTests(unittest.TestCase):
         self.assertEqual(normalize_company_name("示例（北京）有限公司"), normalize_company_name("示例北京有限公司"))
 
 
+    def test_quote_price_aliases_and_extended_fields_are_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_csv(root, "quote_prices.csv", [{
+                "record_type": "quote", "project_name": "quote-project", "bidder_name": "bidder-a",
+                "total_price": "120", "control_price": "130", "price_unit": "10k",
+                "quote_type": "TOTAL", "line_item_code": "line-01", "line_item_name": "service-a",
+                "qty": "2", "unit_price": "60",
+            }])
+            (root / "quote_prices.jsonl").write_text(json.dumps({
+                "record_type": "quote", "project_name": "quote-project", "bidder_name": "bidder-b",
+                "total_price": "1210000", "control_price": "1300000", "currency_unit": "yuan",
+                "quote_scope": "item", "item_code": "line-02", "item_name": "service-b",
+                "quantity": "bad", "unit_price": "-1",
+            }) + "\n", encoding="utf-8")
+            result = ingest_audit_data(root, root / "out")
+            records = [json.loads(line) for line in (root / "out" / "audit_records.jsonl").read_text(encoding="utf-8").splitlines()]
+            csv_record = next(row for row in records if row["bidder_name"] == "bidder-a")
+            json_record = next(row for row in records if row["bidder_name"] == "bidder-b")
+            self.assertEqual(csv_record["amount"], "120")
+            self.assertEqual(csv_record["control_amount"], "130")
+            self.assertEqual(csv_record["amount_unit"], "10k")
+            self.assertEqual(csv_record["quote_scope"], "total")
+            self.assertEqual(csv_record["item_code"], "line-01")
+            self.assertEqual(csv_record["unit_price"], "60")
+            self.assertEqual(json_record["amount_unit"], "yuan")
+            self.assertIsNone(json_record["quantity"])
+            self.assertIsNone(json_record["unit_price"])
+            codes = result["coverage"]["data_quality"]["issue_codes"]
+            self.assertGreaterEqual(codes.get("invalid_quantity", 0), 1)
+            self.assertGreaterEqual(codes.get("invalid_unit_price", 0), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
