@@ -41,6 +41,13 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--output", type=Path, default=settings.project_root / "data" / "audit_ingestion")
     ingest.add_argument("--strict", action="store_true", help="遇到 schema 错误时以失败退出")
 
+    links = subparsers.add_parser("analyze-links", help="基于 M1 标准记录生成 IP、设备和文件元数据关联线索")
+    links.add_argument("--input", type=Path, default=settings.project_root / "data" / "audit_ingestion")
+    links.add_argument("--output", type=Path, default=settings.project_root / "data" / "network_analysis")
+    links.add_argument("--exclude-ip", action="append", default=[], help="可重复指定平台、代理机构或采购单位公共出口 IP")
+    links.add_argument("--network-window-minutes", type=int, default=30)
+    links.add_argument("--metadata-window-seconds", type=int, default=300)
+
     analyze = subparsers.add_parser("analyze", help="生成项目内无监督异常线索与页码证据")
     analyze.add_argument("--input", type=Path, default=settings.project_root / "data" / "processed")
     analyze.add_argument("--output", type=Path, default=settings.project_root / "data" / "analysis")
@@ -117,6 +124,18 @@ def main(argv: list[str] | None = None) -> None:
         from .audit_ingestion import ingest_audit_data
 
         result = ingest_audit_data(args.input, args.output, strict=args.strict)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.command == "analyze-links":
+        from .network_analysis import build_network_analysis
+
+        result = build_network_analysis(
+            args.input,
+            args.output,
+            excluded_ips=args.exclude_ip,
+            network_window_seconds=max(1, args.network_window_minutes) * 60,
+            metadata_window_seconds=max(1, args.metadata_window_seconds),
+        )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
     if args.command == "baseline":

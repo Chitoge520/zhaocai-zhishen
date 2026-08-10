@@ -7,6 +7,7 @@
 - 已完成内部压缩包整理和投标文件分类
 - 已建立统一 CLI、配置和测试入口
 - 已完成 M1 统一多源审计数据层，支持 CSV/JSONL、跨项目 `bidder_id`、来源行追溯和四类覆盖率摘要
+- 已完成 M2 IP、设备、账号和文件元数据关联，支持 11 类独立信号、公共出口排除、全组合覆盖和证据引用图谱
 - 支持 DOCX、文本型 PDF 和扫描 PDF 识别
 - 支持 RTX/NVIDIA GPU PaddleOCR，自动模式优先使用 GPU，失败时回退 RapidOCR
 - 可生成 `documents.jsonl`、`pages.jsonl`、`unsupervised_samples.jsonl` 和失败清单
@@ -82,6 +83,22 @@ $env:PYTHONPATH='src'
   --output data/audit_ingestion `
   --strict
 ```
+
+## 生成 IP、设备和文件元数据关联线索
+
+M2 只消费 M1 已校验标准记录，对同项目不同投标人执行全组合比较：
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m zhaocai_zhishen analyze-links `
+  --input data/audit_ingestion `
+  --output data/network_analysis
+```
+
+输出包括 `network_features.jsonl`、`network_graph.json` 和 `network_analysis_summary.json`。默认网络窗口为 30 分钟、文件时间窗口为 300 秒；可用 `--exclude-ip` 指定公共出口 IP。
+
+每类信号分别标记 `triggered`、`no_signal`、`not_provided` 或 `excluded`。系统只输出待复核异常线索；单一 IP、设备、账号、作者、哈希或时间接近不能直接定性。共享网络和元数据值在结果中脱敏。模块说明见 `docs/module-reports/module-15-network-metadata-linkage.md`。
+
 
 ## 生成无监督样本
 
@@ -183,7 +200,8 @@ $env:PYTHONPATH=".\src"
 python -m unittest discover -s tests -v
 ```
 
-M1 验收时共有 55 项单元测试，其中 M1 统一数据层专项测试 9 项。安装开发依赖后也可以使用 `pytest`。
+当前全量回归共有 65 项单元测试，其中 M1 统一数据层专项测试 9 项、M2 关联分析专项测试 10 项。M0 基线冻结时为 46 项，历史口径保持不变。安装开发依赖后也可以使用 `pytest`。
+
 ## 比赛版本与安全基线
 
 当前比赛开发基线为 `0.3.0` / `competition-m0-2026.08`。统一 schema、算法版本、数据边界和聚合基线说明见 `docs/versioning-and-baseline.md`。

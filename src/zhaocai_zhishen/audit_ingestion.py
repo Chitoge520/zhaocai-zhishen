@@ -26,6 +26,7 @@ from .audit_schema import (
     stable_project_id,
     validate_and_normalize_fields,
 )
+from .metadata_analysis import enrich_document_record
 
 MAX_STRUCTURED_FILE_BYTES = 64 * 1024 * 1024
 MAX_STRUCTURED_ROWS = 1_000_000
@@ -427,12 +428,18 @@ def _build_record(row: dict[str, Any], source: SourceReference, registry: Bidder
         event_time=normalize_text(row.get("event_time")),
         ip_address=normalize_text(row.get("ip_address")),
         device_id=normalize_text(row.get("device_id")),
+        account_id=normalize_text(row.get("account_id")),
         file_name=normalize_text(row.get("file_name")),
         file_path=normalize_text(row.get("file_path")),
         file_sha256=normalize_text(row.get("file_sha256")),
         author=normalize_text(row.get("author")),
+        file_creator=normalize_text(row.get("file_creator")),
+        pdf_producer=normalize_text(row.get("pdf_producer")),
         created_at=normalize_text(row.get("created_at")),
         modified_at=normalize_text(row.get("modified_at")),
+        uploaded_at=normalize_text(row.get("uploaded_at")),
+        network_role=normalize_text(row.get("network_role")),
+        is_public_exit=row.get("is_public_exit"),
         relation_type=normalize_text(row.get("relation_type")),
         related_bidder_id=related_bidder_id,
         related_bidder_name=related_name,
@@ -585,6 +592,7 @@ def ingest_audit_data(input_dir: Path, output_dir: Path, *, strict: bool = False
     for normalized, source in normalized_rows:
         record, record_issues = _build_record(normalized, source, registry)
         issues.extend(record_issues)
+        enrich_document_record(record, input_dir)
         fingerprint = record.fingerprint()
         existing = records_by_fingerprint.get(fingerprint)
         if existing is not None:

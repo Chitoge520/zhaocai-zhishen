@@ -69,13 +69,19 @@ FIELD_ALIASES = {
     "currency": {"currency", "币种", "货币"},
     "event_time": {"event_time", "timestamp", "time", "事件时间", "操作时间", "时间"},
     "ip_address": {"ip_address", "ip", "ip地址", "网络地址"},
-    "device_id": {"device_id", "device", "设备编号", "设备标识", "终端标识"},
+    "device_id": {"device_id", "device", "device_fingerprint", "设备编号", "设备标识", "终端标识", "设备指纹"},
+    "account_id": {"account_id", "account", "bid_account", "投标账号", "账号", "用户账号"},
     "file_name": {"file_name", "filename", "文件名", "文档名称"},
     "file_path": {"file_path", "path", "standard_path", "source_file", "文件路径", "文档路径"},
     "file_sha256": {"file_sha256", "sha256", "file_hash", "文件哈希", "文件摘要"},
-    "author": {"author", "作者", "文档作者"},
+    "author": {"author", "file_author", "作者", "文档作者", "文件作者"},
+    "file_creator": {"file_creator", "creator", "创建者", "文件创建者"},
+    "pdf_producer": {"pdf_producer", "producer", "pdf生成器", "pdf生成工具"},
     "created_at": {"created_at", "file_created_at", "创建时间"},
     "modified_at": {"modified_at", "file_modified_at", "修改时间"},
+    "uploaded_at": {"uploaded_at", "upload_time", "submitted_at", "上传时间", "提交时间"},
+    "network_role": {"network_role", "ip_role", "网络角色", "ip角色"},
+    "is_public_exit": {"is_public_exit", "public_exit", "是否公共出口", "公共出口ip"},
     "relation_type": {"relation_type", "关系类型"},
     "related_bidder_name": {"related_bidder_name", "关联投标人", "关联企业名称"},
     "related_credit_code": {"related_credit_code", "关联信用代码"},
@@ -90,8 +96,11 @@ _SENSITIVE_FIELDS = {
     "related_credit_code",
     "ip_address",
     "device_id",
+    "account_id",
     "file_path",
     "author",
+    "file_creator",
+    "pdf_producer",
 }
 
 _CREDIT_CODE_CHARS = "0123456789ABCDEFGHJKLMNPQRTUWXY"
@@ -242,6 +251,27 @@ def normalize_ip_address(value: object) -> tuple[str, bool]:
         return "", False
 
 
+def ip_network_prefix(value: object) -> str:
+    """返回用于关联分析的稳定网段：IPv4 /24，IPv6 /64。"""
+    text, ok = normalize_ip_address(value)
+    if not ok or not text:
+        return ""
+    address = ipaddress.ip_address(text)
+    prefix = 24 if address.version == 4 else 64
+    return str(ipaddress.ip_network(f"{address}/{prefix}", strict=False))
+
+
+def parse_optional_bool(value: object) -> tuple[bool | None, bool]:
+    text = normalize_text(value).casefold()
+    if not text:
+        return None, True
+    if text in {"1", "true", "yes", "y", "是", "公共出口"}:
+        return True, True
+    if text in {"0", "false", "no", "n", "否", "非公共出口"}:
+        return False, True
+    return None, False
+
+
 def normalize_sha256(value: object) -> tuple[str, bool]:
     text = re.sub(r"\s+", "", str(value or "")).lower()
     if not text:
@@ -302,12 +332,18 @@ class AuditRecord:
     event_time: str = ""
     ip_address: str = ""
     device_id: str = ""
+    account_id: str = ""
     file_name: str = ""
     file_path: str = ""
     file_sha256: str = ""
     author: str = ""
+    file_creator: str = ""
+    pdf_producer: str = ""
     created_at: str = ""
     modified_at: str = ""
+    uploaded_at: str = ""
+    network_role: str = ""
+    is_public_exit: bool | None = None
     relation_type: str = ""
     related_bidder_id: str = ""
     related_bidder_name: str = ""
@@ -382,7 +418,7 @@ def validate_and_normalize_fields(
             value_hint=redacted_value_hint("amount", canonical.get("amount")),
         ))
 
-    for time_field in ("event_time", "created_at", "modified_at"):
+    for time_field in ("event_time", "created_at", "modified_at", "uploaded_at"):
         parsed_time, time_ok = parse_timestamp(canonical.get(time_field))
         normalized[time_field] = parsed_time
         if not time_ok:
@@ -407,6 +443,19 @@ def validate_and_normalize_fields(
             source_path=source.source_path,
             row_number=source.row_number,
             value_hint=redacted_value_hint("ip_address", canonical.get("ip_address")),
+        ))
+
+    public_exit, public_exit_ok = parse_optional_bool(canonical.get("is_public_exit"))
+    normalized["is_public_exit"] = public_exit
+    if not public_exit_ok:
+        issues.append(ValidationIssue(
+            code="invalid_boolean",
+            message="公共出口标记无法识别，已按未知值降级处理",
+            severity="warning",
+            field="is_public_exit",
+            source_path=source.source_path,
+            row_number=source.row_number,
+            value_hint=redacted_value_hint("is_public_exit", canonical.get("is_public_exit")),
         ))
 
     file_sha256, sha_ok = normalize_sha256(canonical.get("file_sha256"))
