@@ -16,7 +16,7 @@ class ReportingTests(unittest.TestCase):
     def test_html_and_docx_include_boundary_and_finding(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for directory in ("analysis", "processed", "training", "models"):
+            for directory in ("analysis", "processed", "training", "models", "risk_fusion"):
                 (root / directory).mkdir()
             (root / "analysis" / "analysis_summary.json").write_text(
                 json.dumps({"project_count": 1, "document_count": 2, "pair_count": 1, "anomaly_count": 1}), encoding="utf-8"
@@ -39,6 +39,13 @@ class ReportingTests(unittest.TestCase):
             (root / "training" / "summary.json").write_text(json.dumps({"archive_count": 1}), encoding="utf-8")
             (root / "models" / "bid_anomaly_model.json").write_text(json.dumps({"model_type": "test"}), encoding="utf-8")
             (root / "models" / "training_summary.json").write_text(json.dumps({"pair_count": 1}), encoding="utf-8")
+            (root / "risk_fusion" / "risk_fusion_summary.json").write_text(json.dumps({
+                "high_risk_project_count": 1, "medium_risk_project_count": 2, "evidence_event_count": 7,
+            }), encoding="utf-8")
+            (root / "risk_fusion" / "project_risk_results.jsonl").write_text(json.dumps({
+                "project_id": "p1", "risk_score": 56, "risk_level": "high",
+                "evidence_chain": {"calculation": {"independent_layers": ["network", "quote"]}},
+            }) + "\n", encoding="utf-8")
 
             payload = build_report_payload(root / "analysis", root / "processed", root / "training", root / "models")
             html = render_html_report(payload).decode("utf-8")
@@ -50,6 +57,10 @@ class ReportingTests(unittest.TestCase):
             self.assertIn("不直接认定串标", html)
             self.assertIn("甲公司", text)
             self.assertIn("共同电话", text)
+            self.assertIn("全样本风险融合与复核优先级", html)
+            self.assertIn("高风险项目：1", html)
+            self.assertIn("全样本风险融合与复核优先级", text)
+            self.assertIn("网络关联触发组合", text)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,10 @@ from docx.shared import Inches, Pt
 
 from .analysis_results import load_unsupervised_results
 from .evidence_graph import build_evidence_graph
+from .network_analysis import load_network_analysis
+from .quote_analysis import load_quote_analysis
+from .cooccurrence_analysis import load_cooccurrence_analysis
+from .risk_fusion import load_risk_fusion
 
 
 def _read_json(path: Path) -> dict:
@@ -42,6 +46,11 @@ def build_report_payload(
     model = _read_json(models_dir / "bid_anomaly_model.json")
     model_summary = _read_json(models_dir / "training_summary.json")
     graph = build_evidence_graph(analysis.get("entities", []), analysis.get("pairs", []), analysis.get("anomalies", []))
+    artifact_root = analysis_dir.parent
+    network = load_network_analysis(artifact_root / "network_analysis")
+    quotes = load_quote_analysis(artifact_root / "quote_analysis")
+    cooccurrence = load_cooccurrence_analysis(artifact_root / "cooccurrence_analysis")
+    risk_fusion = load_risk_fusion(artifact_root / "risk_fusion")
     summary = analysis.get("summary", {})
     return {
         "title": title,
@@ -53,6 +62,10 @@ def build_report_payload(
         "model": model,
         "model_summary": model_summary,
         "graph": graph,
+        "network": network,
+        "quotes": quotes,
+        "cooccurrence": cooccurrence,
+        "risk_fusion": risk_fusion,
         "llm": llm or {"status": "skipped", "findings": [], "validated_finding_count": 0},
         "boundary": "本报告输出异常线索和待复核证据，不直接认定串标、围标或其他违规行为。",
     }
@@ -83,6 +96,9 @@ def _metric_rows(payload: dict) -> list[tuple[str, object]]:
         ("待复核线索数", summary.get("anomaly_count", len(payload.get("analysis", {}).get("anomalies", [])))),
         ("重复片段证据数", summary.get("repeated_segment_evidence_count", 0)),
         ("公共模板片段排除数", summary.get("common_template_segment_count", 0)),
+        ("高风险项目", payload.get("risk_fusion", {}).get("summary", {}).get("high_risk_project_count", 0)),
+        ("中风险项目", payload.get("risk_fusion", {}).get("summary", {}).get("medium_risk_project_count", 0)),
+        ("融合证据事件", payload.get("risk_fusion", {}).get("summary", {}).get("evidence_event_count", 0)),
     ]
 
 
@@ -92,6 +108,10 @@ def render_html_report(payload: dict) -> bytes:
     graph = payload.get("graph", {})
     llm = payload.get("llm", {})
     findings = payload.get("analysis", {}).get("anomalies", [])
+    fusion_summary = payload.get("risk_fusion", {}).get("summary", {})
+    network_summary = payload.get("network", {}).get("summary", {})
+    quote_summary = payload.get("quotes", {}).get("summary", {})
+    cooccurrence_summary = payload.get("cooccurrence", {}).get("summary", {})
     metrics = "".join(
         f'<div class="metric"><span>{_esc(label)}</span><strong>{_esc(value)}</strong></div>'
         for label, value in _metric_rows(payload)
@@ -130,11 +150,11 @@ table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #d6dde6;padd
 <div class="notice">{_esc(payload.get('boundary'))}</div>
 <h2>一、分析概览</h2><div class="metrics">{metrics}</div>
 <p>分析项目数：{_esc(summary.get('project_count', 0))}；投标文件数：{_esc(summary.get('document_count', 0))}；项目内比较数：{_esc(summary.get('pair_count', 0))}；待复核线索数：{_esc(summary.get('anomaly_count', len(findings)))}</p>
-<h2>二、关系图谱摘要</h2><table><tr><th>项目节点</th><th>投标人节点</th><th>文件节点</th><th>实体/关系总数</th></tr><tr><td>{_esc(len([n for n in graph.get('nodes', []) if n.get('type') == 'project']))}</td><td>{_esc(len([n for n in graph.get('nodes', []) if n.get('type') == 'bidder']))}</td><td>{_esc(len([n for n in graph.get('nodes', []) if n.get('type') == 'document']))}</td><td>{_esc(graph.get('node_count', 0))} / {_esc(graph.get('edge_count', 0))}</td></tr></table>
-<h2>三、异常线索明细</h2>{''.join(finding_sections)}
- <h2>四、模型和大模型状态</h2><p>模型类型：{_esc(payload.get('model', {}).get('model_type', '未读取'))}；训练比较数：{_esc(model_summary.get('pair_count', payload.get('model', {}).get('training_pair_count', 0)))}；标签状态：{_esc(model_summary.get('label_status', 'unlabeled_unsupervised'))}；规则线索：{_esc(summary.get('rule_anomaly_count', '-'))}；模型触发：{_esc(summary.get('model_triggered_count', '-'))}。</p>
+<h2>二、全样本风险融合与复核优先级</h2><p>高风险项目：{_esc(fusion_summary.get('high_risk_project_count', 0))}；中风险项目：{_esc(fusion_summary.get('medium_risk_project_count', 0))}；融合证据事件：{_esc(fusion_summary.get('evidence_event_count', 0))}。高风险需要至少一个强信号及另一独立分析维度佐证；结果仅用于人工复核排序。</p><h2>三、核心信号与关系图谱摘要</h2><p>网络关联触发组合：{_esc(network_summary.get('triggered_pair_count', 0))}；报价模式触发组合：{_esc(quote_summary.get('triggered_pair_count', 0))}；跨项目共现触发组合：{_esc(cooccurrence_summary.get('triggered_pair_count', 0))}。</p><h2>四、关系图谱摘要</h2><table><tr><th>项目节点</th><th>投标人节点</th><th>文件节点</th><th>实体/关系总数</th></tr><tr><td>{_esc(len([n for n in graph.get('nodes', []) if n.get('type') == 'project']))}</td><td>{_esc(len([n for n in graph.get('nodes', []) if n.get('type') == 'bidder']))}</td><td>{_esc(len([n for n in graph.get('nodes', []) if n.get('type') == 'document']))}</td><td>{_esc(graph.get('node_count', 0))} / {_esc(graph.get('edge_count', 0))}</td></tr></table>
+<h2>五、异常线索明细</h2>{''.join(finding_sections)}
+ <h2>六、模型和大模型状态</h2><p>模型类型：{_esc(payload.get('model', {}).get('model_type', '未读取'))}；训练比较数：{_esc(model_summary.get('pair_count', payload.get('model', {}).get('training_pair_count', 0)))}；标签状态：{_esc(model_summary.get('label_status', 'unlabeled_unsupervised'))}；规则线索：{_esc(summary.get('rule_anomaly_count', '-'))}；模型触发：{_esc(summary.get('model_triggered_count', '-'))}。</p>
 <p>大模型状态：{_esc(llm.get('status', 'skipped'))}；通过本地引用校验：{_esc(llm.get('validated_finding_count', 0))} 条。大模型只用于辅助解释候选线索。</p>
-<h2>五、复核建议</h2><ol><li>按照线索 ID、投标人和页码回到原始文件。</li><li>核对共同电话、地址、邮箱、联系人和文件形成时间是否具有业务合理性。</li><li>结合开标记录、报价表、评标材料和外部登记信息进行人工判断。</li><li>将复核结果记录为待复核、排除或需要进一步调查，不能仅凭模型分数定性。</li></ol>
+<h2>七、复核建议</h2><ol><li>按照线索 ID、投标人和页码回到原始文件。</li><li>核对共同电话、地址、邮箱、联系人和文件形成时间是否具有业务合理性。</li><li>结合开标记录、报价表、评标材料和外部登记信息进行人工判断。</li><li>将复核结果记录为待复核、排除或需要进一步调查，不能仅凭模型分数定性。</li></ol>
 <p class="muted">模型版本：{_esc(payload.get('model', {}).get('schema_version', '未读取'))}；报告数据版本：{_esc(payload.get('analysis', {}).get('summary', {}).get('output_dir', 'local-artifacts'))}</p>
 </main></body></html>"""
     return html_text.encode("utf-8")
@@ -182,14 +202,28 @@ def build_docx_report(payload: dict) -> bytes:
         f"项目内比较数：{summary.get('pair_count', 0)}；待复核线索数：{summary.get('anomaly_count', 0)}。"
     )
 
+    fusion_summary = payload.get("risk_fusion", {}).get("summary", {})
+    network_summary = payload.get("network", {}).get("summary", {})
+    quote_summary = payload.get("quotes", {}).get("summary", {})
+    cooccurrence_summary = payload.get("cooccurrence", {}).get("summary", {})
+    document.add_heading("二、全样本风险融合与复核优先级", level=1)
+    document.add_paragraph(
+        f"高风险项目：{fusion_summary.get('high_risk_project_count', 0)}；中风险项目：{fusion_summary.get('medium_risk_project_count', 0)}；"
+        f"融合证据事件：{fusion_summary.get('evidence_event_count', 0)}。高风险需要至少一个强信号及另一独立分析维度佐证；结果仅用于人工复核排序。"
+    )
+    document.add_heading("三、核心信号摘要", level=1)
+    document.add_paragraph(
+        f"网络关联触发组合：{network_summary.get('triggered_pair_count', 0)}；报价模式触发组合：{quote_summary.get('triggered_pair_count', 0)}；"
+        f"跨项目共现触发组合：{cooccurrence_summary.get('triggered_pair_count', 0)}。"
+    )
     graph = payload.get("graph", {})
-    document.add_heading("二、关系图谱摘要", level=1)
+    document.add_heading("四、关系图谱摘要", level=1)
     document.add_paragraph(
         f"图谱包含 {graph.get('node_count', 0)} 个节点和 {graph.get('edge_count', 0)} 条关系，"
         f"覆盖 {graph.get('project_count', 0)} 个项目。关系用于定位证据入口，不代表违规结论。"
     )
 
-    document.add_heading("三、异常线索明细", level=1)
+    document.add_heading("五、异常线索明细", level=1)
     findings = payload.get("analysis", {}).get("anomalies", [])
     if not findings:
         document.add_paragraph("当前阈值下没有待复核异常线索。")
@@ -208,7 +242,7 @@ def build_docx_report(payload: dict) -> bytes:
             document.add_paragraph(str(item), style="List Bullet")
         document.add_paragraph("建议复核：回到原始文件核对投标人主体、页码、共同实体来源和文件形成时间。")
 
-    document.add_heading("四、模型和大模型状态", level=1)
+    document.add_heading("六、模型和大模型状态", level=1)
     model = payload.get("model", {})
     model_summary = payload.get("model_summary", {})
     llm = payload.get("llm", {})
@@ -222,7 +256,7 @@ def build_docx_report(payload: dict) -> bytes:
         f"{llm.get('validated_finding_count', 0)} 条。大模型只用于辅助解释候选线索。"
     )
 
-    document.add_heading("五、复核建议", level=1)
+    document.add_heading("七、复核建议", level=1)
     for item in (
         "按照线索 ID、投标人和页码回到原始文件。",
         "核对共同电话、地址、邮箱、联系人和文件形成时间是否具有业务合理性。",
