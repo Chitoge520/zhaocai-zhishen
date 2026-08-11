@@ -20,6 +20,7 @@ from .model_inference import run_model_inference
 from .network_analysis import build_network_analysis, load_network_analysis
 from .quote_analysis import build_quote_analysis, load_quote_analysis
 from .cooccurrence_analysis import build_cooccurrence_analysis, load_cooccurrence_analysis
+from .risk_fusion import build_risk_fusion, load_risk_fusion
 from .unsupervised_analysis import build_unsupervised_analysis
 
 _GPU_JOB_LOCK = threading.Lock()
@@ -124,6 +125,12 @@ def _run_job(job_dir: Path, model_path: Path) -> None:
         _write_status(job_dir, phase="冻结模型推理", progress=84)
         inference = run_model_inference(job_dir / "analysis", model_path, job_dir / "inference")
         _ensure_job_active(job_dir, deadline)
+        _write_status(job_dir, phase="多信号风险融合与证据链标准化", progress=89)
+        risk_fusion = build_risk_fusion(
+            job_dir / "analysis", job_dir / "network_analysis", job_dir / "quote_analysis",
+            job_dir / "cooccurrence_analysis", job_dir / "risk_fusion", job_dir / "inference",
+        )
+        _ensure_job_active(job_dir, deadline)
         _write_status(job_dir, phase="大模型辅助复核", progress=92)
         try:
             llm = run_llm_analysis(
@@ -148,7 +155,7 @@ def _run_job(job_dir: Path, model_path: Path) -> None:
             state="completed",
             phase="分析完成",
             progress=100,
-            result={"inference": inference, "llm": llm, "audit_ingestion": audit_ingestion, "network_analysis": network_analysis, "quote_analysis": quote_analysis, "cooccurrence_analysis": cooccurrence_analysis},
+            result={"inference": inference, "risk_fusion": risk_fusion, "llm": llm, "audit_ingestion": audit_ingestion, "network_analysis": network_analysis, "quote_analysis": quote_analysis, "cooccurrence_analysis": cooccurrence_analysis},
         )
     except Exception as exc:
         (job_dir / "error.log").write_text(traceback.format_exc(), encoding="utf-8")
@@ -227,6 +234,7 @@ def load_job_results(jobs_root: Path, job_id: str) -> dict | None:
     network = load_network_analysis(job_dir / "network_analysis")
     quotes = load_quote_analysis(job_dir / "quote_analysis")
     cooccurrence = load_cooccurrence_analysis(job_dir / "cooccurrence_analysis")
+    risk_fusion = load_risk_fusion(job_dir / "risk_fusion")
     llm = json.loads(llm_path.read_text(encoding="utf-8")) if llm_path.exists() else {
         "status": "skipped",
         "findings": [],

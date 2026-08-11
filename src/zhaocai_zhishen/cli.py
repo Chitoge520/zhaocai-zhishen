@@ -56,6 +56,14 @@ def build_parser() -> argparse.ArgumentParser:
     cooccurrence.add_argument("--input", type=Path, default=settings.project_root / "data" / "audit_ingestion")
     cooccurrence.add_argument("--output", type=Path, default=settings.project_root / "data" / "cooccurrence_analysis")
 
+    fusion = subparsers.add_parser("analyze-risk-fusion", help="执行 M5 多信号风险融合与三级证据链标准化")
+    fusion.add_argument("--analysis", type=Path, default=settings.project_root / "data" / "analysis")
+    fusion.add_argument("--network", type=Path, default=settings.project_root / "data" / "network_analysis")
+    fusion.add_argument("--quotes", type=Path, default=settings.project_root / "data" / "quote_analysis")
+    fusion.add_argument("--cooccurrence", type=Path, default=settings.project_root / "data" / "cooccurrence_analysis")
+    fusion.add_argument("--model", type=Path, default=settings.project_root / "data" / "inference")
+    fusion.add_argument("--output", type=Path, default=settings.project_root / "data" / "risk_fusion")
+
     analyze = subparsers.add_parser("analyze", help="生成项目内无监督异常线索与页码证据")
     analyze.add_argument("--input", type=Path, default=settings.project_root / "data" / "processed")
     analyze.add_argument("--output", type=Path, default=settings.project_root / "data" / "analysis")
@@ -156,6 +164,12 @@ def main(argv: list[str] | None = None) -> None:
         from .cooccurrence_analysis import build_cooccurrence_analysis
 
         result = build_cooccurrence_analysis(args.input, args.output)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.command == "analyze-risk-fusion":
+        from .risk_fusion import build_risk_fusion
+
+        result = build_risk_fusion(args.analysis, args.network, args.quotes, args.cooccurrence, args.output, args.model)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
     if args.command == "baseline":

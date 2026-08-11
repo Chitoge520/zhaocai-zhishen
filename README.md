@@ -8,6 +8,7 @@
 - 已建立统一 CLI、配置和测试入口
 - 已完成 M1 统一多源审计数据层，支持 CSV/JSONL、跨项目 `bidder_id`、来源行追溯和四类覆盖率摘要
 - 已完成 M2 IP、设备、账号和文件元数据关联，支持 11 类独立信号、公共出口排除、全组合覆盖和证据引用图谱
+- 已完成 M5 多信号风险融合：统一网络、报价、跨项目共现与项目内模型线索；提供项目、投标人对、团体、文档四级待复核排序和三级脱敏证据链
 - 支持 DOCX、文本型 PDF 和扫描 PDF 识别
 - 支持 RTX/NVIDIA GPU PaddleOCR，自动模式优先使用 GPU，失败时回退 RapidOCR
 - 可生成 `documents.jsonl`、`pages.jsonl`、`unsupervised_samples.jsonl` 和失败清单
@@ -115,6 +116,23 @@ $env:PYTHONPATH='src'
 
 所有报价结果均为待复核异常线索，不能宣传为真实准确率或直接认定围标、串标、违法违规。单一价格接近、尾数、固定差额、统计偏离或分项相关性必须结合网络、设备、文件和业务流程证据交叉验证。模块说明见 docs/module-reports/module-16-quote-clustering.md，脱敏模板见 docs/templates/quote-analysis-example.jsonl。
 
+## 生成多信号风险融合与三级证据链
+
+M5 将网络、报价、跨项目共现和项目内无监督结果聚合为可解释的待复核排序：
+
+~~~powershell
+.\run.ps1 analyze-risk-fusion `
+  --analysis data/analysis `
+  --network data/network_analysis `
+  --quotes data/quote_analysis `
+  --cooccurrence data/cooccurrence_analysis `
+  --model data/inference `
+  --output data/risk_fusion
+~~~
+
+输出包括 `project_risk_results.jsonl`、`bidder_pair_risk_results.jsonl`、`group_risk_results.jsonl`、`document_risk_results.jsonl`、`evidence_events.jsonl` 和 `risk_fusion_summary.json`；服务接口为 `GET /api/risk-fusion`，上传任务结果位于 `GET /api/projects/jobs/{job_id}/results` 的 `risk_fusion` 字段。
+
+融合规则按强、佐证和弱信号分层：仅弱信号最高为低风险；高风险必须同时具备至少一个强信号和另一独立分析维度的佐证。缺失字段不会被解释为低风险。三级证据链不复制 IP、设备、账号、联系人、地址或原始文件路径，仅保留分数贡献、`record_id`、来源哈希及行号索引，供受控环境回溯。
 ## 生成无监督样本
 
 ```powershell
