@@ -136,3 +136,19 @@ data/jobs/<job_id>/status.json
 - “异常分数就是违法概率”；
 - “准确率、召回率已经达到某个数值”，除非有独立、可复现、带版本的数据评测；
 - “大模型看过全部投标文件”，系统实际只发送脱敏后的候选证据片段。
+
+<!-- fully-desensitized-offline-demo-runbook -->
+
+## 6. 完全脱敏离线演示补充
+
+1. 开场后点击“加载离线演示”，应显示“完全脱敏虚构快照”提示。
+2. 该模式不依赖 `data/models`、`data/analysis` 或外部网络，不在现场首次运行 OCR 或训练。
+3. 如需核验，执行：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:4180/api/demo
+```
+
+返回中应包含 `ready: true`、`fully_desensitized: true`、`fictional: true` 和 `source: fully_desensitized_fictional`。
+
+对评委的准确表述：完全脱敏离线快照只展示系统流程，数据和证据均为虚构示例。不要说“离线演示中的线索就是实际案件结论”或“离线演示证明了真实准确率”。

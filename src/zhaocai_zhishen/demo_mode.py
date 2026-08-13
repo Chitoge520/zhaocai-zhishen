@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .analysis_results import load_unsupervised_results
+from .competition_demo import build_fully_desensitized_demo_snapshot
 
 
 def _read_json(path: Path) -> dict:
@@ -23,12 +24,15 @@ def _count_gpu_documents(processed_dir: Path) -> int:
     return sum(1 for path in cache_dir.glob("*.json") if "paddle-gpu" in path.name)
 
 
-def load_demo_snapshot(data_root: Path, analysis_dir: Path) -> dict:
+def load_demo_snapshot(data_root: Path, analysis_dir: Path, *, fully_desensitized: bool = False) -> dict:
     """Load the prepared local results used by the competition demo.
 
     The demo is deliberately read-only: it never invokes OCR, model training, or
     the LLM. This keeps the showcase deterministic and usable without network.
     """
+
+    if fully_desensitized:
+        return build_fully_desensitized_demo_snapshot()
 
     data_root = data_root.resolve()
     training = _read_json(data_root / "training_internal" / "summary.json")
@@ -55,6 +59,10 @@ def load_demo_snapshot(data_root: Path, analysis_dir: Path) -> dict:
     return {
         "ready": ready,
         "mode": "offline-demo",
+        "schema_version": "competition-offline-demo/v1",
+        "source": "local_precomputed_artifacts",
+        "fully_desensitized": False,
+        "fictional": False,
         "title": "历史基线离线演示案例",
         "message": (
             "演示数据已从本地预计算结果加载，不会触发 OCR、训练或大模型调用。"

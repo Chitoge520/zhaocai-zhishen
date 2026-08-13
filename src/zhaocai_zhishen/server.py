@@ -96,7 +96,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(load_unsupervised_results(settings.analysis_dir, model_path=MODEL_PATH))
             return
         if path == "/api/demo":
-            self._send_json(load_demo_snapshot(DATA_ROOT, settings.analysis_dir))
+            self._send_json(load_demo_snapshot(DATA_ROOT, settings.analysis_dir, fully_desensitized=True))
             return
         if path == "/api/network-analysis":
             self._send_json(load_network_analysis(DATA_ROOT / "network_analysis"))

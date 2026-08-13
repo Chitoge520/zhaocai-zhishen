@@ -16,6 +16,17 @@ class DemoModeTests(unittest.TestCase):
             self.assertFalse(snapshot["ready"])
             self.assertEqual(snapshot["metrics"]["archive_count"], 0)
 
+    def test_competition_snapshot_is_fully_desensitized_and_fictional(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            snapshot = load_demo_snapshot(root, root / "analysis", fully_desensitized=True)
+            self.assertTrue(snapshot["ready"])
+            self.assertTrue(snapshot["fully_desensitized"])
+            self.assertTrue(snapshot["fictional"])
+            self.assertEqual(snapshot["source"], "fully_desensitized_fictional")
+            self.assertEqual(snapshot["fusion"]["summary"]["high_risk_project_count"], 1)
+            self.assertIn("demo-finding-a-b", snapshot["evidence_by_finding_id"])
+
     def test_snapshot_contains_metrics_and_local_results(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
