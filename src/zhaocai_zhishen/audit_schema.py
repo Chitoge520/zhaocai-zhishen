@@ -93,6 +93,9 @@ FIELD_ALIASES = {
     "related_bidder_name": {"related_bidder_name", "关联投标人", "关联企业名称"},
     "related_credit_code": {"related_credit_code", "关联信用代码"},
     "source_system": {"source_system", "来源系统"},
+    "agency_id": {"agency_id", "agency", "procurement_agency_id", "代理机构编号", "代理机构", "采购代理机构", "招标代理机构"},
+    "is_winner": {"is_winner", "winner", "award_status", "是否中标", "中标", "中标标记", "中标状态"},
+    "rank": {"rank", "bid_rank", "award_rank", "排名", "名次", "中标排名"},
 }
 
 _SENSITIVE_FIELDS = {
@@ -272,9 +275,9 @@ def parse_optional_bool(value: object) -> tuple[bool | None, bool]:
     text = normalize_text(value).casefold()
     if not text:
         return None, True
-    if text in {"1", "true", "yes", "y", "是", "公共出口"}:
+    if text in {"1", "true", "yes", "y", "是", "公共出口", "中标", "winner", "awarded", "win"}:
         return True, True
-    if text in {"0", "false", "no", "n", "否", "非公共出口"}:
+    if text in {"0", "false", "no", "n", "否", "非公共出口", "未中标", "落标", "non-winner", "lost"}:
         return False, True
     return None, False
 
@@ -363,6 +366,9 @@ class AuditRecord:
     related_bidder_name: str = ""
     related_credit_code: str = ""
     source_system: str = ""
+    agency_id: str = ""
+    is_winner: bool | None = None
+    rank: int | None = None
     extra: dict[str, Any] = field(default_factory=dict)
     source_refs: list[SourceReference] = field(default_factory=list)
     schema_version: str = AUDIT_RECORD_SCHEMA_VERSION
@@ -522,5 +528,34 @@ def validate_and_normalize_fields(
             code = ""
         normalized[field_name] = code
 
+    winner, winner_ok = parse_optional_bool(canonical.get("is_winner"))
+    normalized["is_winner"] = winner
+    if not winner_ok:
+        issues.append(ValidationIssue(
+            code="invalid_is_winner",
+            message="中标标记无法识别，已按未知值降级处理",
+            severity="warning",
+            field="is_winner",
+            source_path=source.source_path,
+            row_number=source.row_number,
+            value_hint=redacted_value_hint("is_winner", canonical.get("is_winner")),
+        ))
+    rank_text = normalize_text(canonical.get("rank"))
+    try:
+        normalized["rank"] = int(rank_text) if rank_text else None
+        if normalized["rank"] is not None and normalized["rank"] <= 0:
+            raise ValueError
+    except ValueError:
+        normalized["rank"] = None
+        issues.append(ValidationIssue(
+            code="invalid_rank",
+            message="排名必须是正整数，已按缺失值降级处理",
+            severity="warning",
+            field="rank",
+            source_path=source.source_path,
+            row_number=source.row_number,
+            value_hint=redacted_value_hint("rank", canonical.get("rank")),
+        ))
+    normalized["agency_id"] = normalize_text(canonical.get("agency_id"))
     normalized["currency"] = normalize_text(canonical.get("currency") or "CNY").upper()
     return normalized, issues

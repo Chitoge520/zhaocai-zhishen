@@ -18,6 +18,7 @@ from .job_manager import cancel_job, create_job, get_job, list_jobs, load_job_re
 from .llm_analysis import get_llm_config, validate_llm_base_url
 from .network_analysis import load_network_analysis
 from .quote_analysis import load_quote_analysis
+from .cooccurrence_analysis import load_cooccurrence_analysis
 from .reporting import build_docx_report, build_report_payload, render_html_report
 
 settings = load_settings()
@@ -101,6 +102,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/quote-analysis":
             self._send_json(load_quote_analysis(DATA_ROOT / "quote_analysis"))
+            return
+        if path == "/api/cooccurrence-analysis":
+            self._send_json(load_cooccurrence_analysis(DATA_ROOT / "cooccurrence_analysis"))
             return
         if path == "/api/evidence-graph":
             self._send_json(load_evidence_graph(settings.analysis_dir, model_path=MODEL_PATH))
@@ -209,10 +213,11 @@ class Handler(BaseHTTPRequestHandler):
             analysis_path = settings.analysis_dir / "analysis_summary.json"
             audit_coverage = load_coverage_summary(DATA_ROOT / "audit_ingestion" / "coverage_summary.json")
             network = load_network_analysis(DATA_ROOT / "network_analysis")
+            cooccurrence = load_cooccurrence_analysis(DATA_ROOT / "cooccurrence_analysis")
             summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else {}
             processed = json.loads(processed_path.read_text(encoding="utf-8")) if processed_path.exists() else {}
             analysis = json.loads(analysis_path.read_text(encoding="utf-8")) if analysis_path.exists() else {}
-            self._send_json({"training": summary, "processed": processed, "analysis": analysis, "audit": audit_coverage, "network": network.get("summary", {}), "ready": bool(summary and analysis)})
+            self._send_json({"training": summary, "processed": processed, "analysis": analysis, "audit": audit_coverage, "network": network.get("summary", {}), "cooccurrence": cooccurrence.get("summary", {}), "ready": bool(summary and analysis)})
             return
         if path == "/api/model/status":
             model_dir = DATA_ROOT / "models"

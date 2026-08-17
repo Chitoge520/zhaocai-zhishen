@@ -453,6 +453,9 @@ def _build_record(row: dict[str, Any], source: SourceReference, registry: Bidder
         related_bidder_name=related_name,
         related_credit_code=related_code,
         source_system=normalize_text(row.get("source_system")),
+        agency_id=normalize_text(row.get("agency_id")),
+        is_winner=row.get("is_winner"),
+        rank=row.get("rank"),
         extra=dict(row.get("extra") or {}),
         source_refs=[source],
     )
